@@ -36,6 +36,7 @@
 #
 # Contributors:
 # Adam Zsarnóczay
+from __future__ import annotations
 import json
 import pandas as pd
 import pelicun
@@ -213,7 +214,7 @@ def convertTunnelToHAZUSclass(AIM):
     elif ("Cut" in AIM["ConstructType"]) or ("Cover" in AIM["ConstructType"]):
         return "HTU2"
     else:
-        # Select HTU2 for unclassfied tunnels because it is more conservative.
+        # Select HTU2 for unclassified tunnels because it is more conservative.
         return "HTU2"
 
 
@@ -661,7 +662,7 @@ def auto_populate(AIM):
 
                     demand_cloning_config['-'.join(edp)] = [
                         f'{tag}-{x}-{direction}'
-                        for x in [f'{i+1}' for i in range(num_segments)]
+                        for x in [f'{i + 1}' for i in range(num_segments)]
                     ]
                 demand_config = {'DemandCloning': demand_cloning_config}
 

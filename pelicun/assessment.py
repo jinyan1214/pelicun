@@ -49,11 +49,14 @@ This module has classes and methods that control the performance assessment.
 
 """
 
+from __future__ import annotations
+from typing import Any
 import json
-from . import base
-from . import file_io
-from . import model
-from .__init__ import __version__ as pelicun_version
+import pandas as pd
+from pelicun import base
+from pelicun import file_io
+from pelicun import model
+from pelicun.__init__ import __version__ as pelicun_version  # type: ignore
 
 
 class Assessment:
@@ -76,7 +79,18 @@ class Assessment:
         Options object.
     """
 
-    def __init__(self, config_options=None):
+    __slots__ = [
+        'stories',
+        'options',
+        'unit_conversion_factors',
+        'log',
+        'demand',
+        'asset',
+        'damage',
+        'loss',
+    ]
+
+    def __init__(self, config_options: dict[str, Any] | None = None):
         """
         Initializes an Assessment object.
 
@@ -85,83 +99,63 @@ class Assessment:
         config_options (Optional[dict]):
             User-specified configuration dictionary.
         """
-
         self.stories = None
-
         self.options = base.Options(config_options, self)
-
         self.unit_conversion_factors = base.parse_units(self.options.units_file)
 
         self.log = self.options.log
-
         self.log.msg(
             f'pelicun {pelicun_version} | \n',
             prepend_timestamp=False,
             prepend_blank_space=False,
         )
-
         self.log.print_system_info()
-
         self.log.div()
         self.log.msg('Assessment Started')
 
-    @property
-    def demand(self):
-        """
-        Return a DemandModel object that manages the demand information.
-
-        """
-        # pylint: disable = access-member-before-definition
-
-        if hasattr(self, '_demand'):
-            return self._demand
-
-        self._demand = model.DemandModel(self)
-        return self.demand
+        self.demand: model.DemandModel = model.DemandModel(self)
+        self.asset: model.AssetModel = model.AssetModel(self)
+        self.damage: model.DamageModel = model.DamageModel(self)
+        self.loss: model.LossModel = model.LossModel(self)
 
     @property
-    def asset(self):
+    def bldg_repair(self):
         """
-        Return an AssetModel object that manages the asset information.
+        <backwards compatibility>
 
-        """
-        # pylint: disable = access-member-before-definition
-
-        if hasattr(self, '_asset'):
-            return self._asset
-
-        self._asset = model.AssetModel(self)
-        return self.asset
-
-    @property
-    def damage(self):
-        """
-        Return an DamageModel object that manages the damage information.
+        Returns
+        -------
+        model.LossModel
+            The loss model.
 
         """
-        # pylint: disable = access-member-before-definition
+        self.log.warn(
+            '`.bldg_repair` is deprecated and will be dropped in '
+            'future versions of pelicun. '
+            'Please use `.loss` instead.'
+        )
 
-        if hasattr(self, '_damage'):
-            return self._damage
-
-        self._damage = model.DamageModel(self)
-        return self.damage
+        return self.loss
 
     @property
     def repair(self):
         """
-        Return a RepairModel object that manages the repair information.
+        <backwards compatibility>
+
+        Returns
+        -------
+        RepairModel_DS
+            The damage state-driven component loss model.
 
         """
-        # pylint: disable = access-member-before-definition
+        self.log.warn(
+            '`.repair` is deprecated and will be dropped in '
+            'future versions of pelicun. '
+            'Please use `.loss` instead.'
+        )
+        return self.loss
 
-        if hasattr(self, '_repair'):
-            return self._repair
-
-        self._repair = model.RepairModel(self)
-        return self.repair
-
-    def get_default_data(self, data_name):
+    def get_default_data(self, data_name: str) -> pd.DataFrame:
         """
         Loads a default data file by name and returns it. This method
         is specifically designed to access predefined CSV files from a
@@ -181,13 +175,30 @@ class Assessment:
             The DataFrame containing the data loaded from the
             specified CSV file.
         """
+
+        # <backwards compatibility>
+        if 'fragility_DB' in data_name:
+            data_name = data_name.replace('fragility_DB', 'damage_DB')
+            self.log.warn(
+                '`fragility_DB` is deprecated and will be dropped in '
+                'future versions of pelicun. '
+                'Please use `damage_DB` instead.'
+            )
+        if 'bldg_repair_DB' in data_name:
+            data_name = data_name.replace('bldg_repair_DB', 'loss_repair_DB')
+            self.log.warn(
+                '`bldg_repair_DB` is deprecated and will be dropped in '
+                'future versions of pelicun. '
+                'Please use `loss_repair_DB` instead.'
+            )
+
         data_path = f'{base.pelicun_path}/resources/SimCenterDBDL/{data_name}.csv'
 
         return file_io.load_data(
             data_path, None, orientation=1, reindex=False, log=self.log
         )
 
-    def get_default_metadata(self, data_name):
+    def get_default_metadata(self, data_name: str) -> dict:
         """
         Load a default metadata file and pass it to the user.
 
@@ -203,6 +214,13 @@ class Assessment:
 
         """
 
+        # <backwards compatibility>
+        if 'fragility_DB' in data_name:
+            data_name = data_name.replace('fragility_DB', 'damage_DB')
+            self.log.warn(
+                '`fragility_DB` is deprecated and will be dropped in '
+                'future versions of pelicun. Please use `damage_DB` instead.'
+            )
         data_path = f'{base.pelicun_path}/resources/SimCenterDBDL/{data_name}.json'
 
         with open(data_path, 'r', encoding='utf-8') as f:
@@ -210,7 +228,7 @@ class Assessment:
 
         return data
 
-    def calc_unit_scale_factor(self, unit):
+    def calc_unit_scale_factor(self, unit: str) -> float:
         """
         Determines the scale factor from input unit to the
         corresponding base unit
@@ -254,7 +272,7 @@ class Assessment:
 
         return scale_factor
 
-    def scale_factor(self, unit):
+    def scale_factor(self, unit: str | None) -> float:
         """
         Returns the scale factor of a given unit. If the unit is
         unknown it raises an error. If the unit is None it returns

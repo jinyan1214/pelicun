@@ -10,7 +10,7 @@ ignore=flycheck_*
 
 # Add files or directories matching the regex patterns to the ignore-list. The
 # regex matches against paths and can be in Posix or Windows format.
-ignore-paths=
+ignore-paths=rulesets
 
 # Files or directories matching the regex patterns are skipped. The regex
 # matches against base names, not paths.
@@ -102,7 +102,6 @@ disable=
     format,
     # We anticipate #3512 where it will become optional
     fixme,
-
 
 [REPORTS]
 
@@ -326,7 +325,7 @@ method-rgx=[a-z_][a-z0-9_]{2,}$
 
 # Regular expression which should only match function or class names that do
 # not require a docstring. Use ^(?!__init__$)_ to also check __init__.
-no-docstring-rgx=__.*__
+no-docstring-rgx=((^test_)|(^_.*(?<!__init__)))
 
 # Minimum line length for functions/classes that require docstrings, shorter
 # ones are exempt.

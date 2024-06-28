@@ -37,6 +37,7 @@
 # Contributors:
 # Adam Zsarnóczay
 
+from __future__ import annotations
 import pandas as pd
 
 ap_DesignLevel = {1940: 'LC', 1975: 'MC', 2100: 'HC'}
@@ -199,21 +200,21 @@ def auto_populate(AIM):
                     'ea',
                     'all',
                     '1, 2',
-                    f"{story_scale(stories, 'S')/stories/2.}",
+                    f"{story_scale(stories, 'S') / stories / 2.}",
                     'N/A',
                 ],
                 f'{FG_NSA}': [
                     'ea',
                     'all',
                     0,
-                    f"{story_scale(stories, 'NSA')/stories}",
+                    f"{story_scale(stories, 'NSA') / stories}",
                     'N/A',
                 ],
                 f'{FG_NSD}': [
                     'ea',
                     'all',
                     '1, 2',
-                    f"{story_scale(stories, 'NSD')/stories/2.}",
+                    f"{story_scale(stories, 'NSD') / stories / 2.}",
                     'N/A',
                 ],
             },

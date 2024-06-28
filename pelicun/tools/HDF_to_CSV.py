@@ -37,6 +37,7 @@
 # Contributors:
 # Adam Zsarnóczay
 
+from __future__ import annotations
 import pandas as pd
 import sys
 import argparse
@@ -52,7 +53,8 @@ def convert_HDF(HDF_path):
     store = pd.HDFStore(HDF_path)
 
     for key in store.keys():
-        store[key].to_csv(f'{CSV_base}_{key[1:].replace("/","_")}.csv')
+
+        store[key].to_csv(f'{CSV_base}_{key[1:].replace("/", "_")}.csv')
 
     store.close()
 
@@ -63,6 +65,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('HDF_path')
 
-    args = parser.parse_args(args)
+    parser_args = parser.parse_args(args)
 
-    convert_HDF(args.HDF_path)
+    convert_HDF(parser_args.HDF_path)

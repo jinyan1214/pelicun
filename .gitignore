@@ -41,3 +41,4 @@ flycheck*.py
 testFolder*
 .vscode*
 *.DS_Store
+/.ropeproject/
