@@ -37,3 +37,7 @@ __pycache__
 .cov2emacs.log
 flycheck*.py
 /notes/
+
+testFolder*
+.vscode*
+*.DS_Store
