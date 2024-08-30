@@ -424,11 +424,20 @@ def auto_populate(AIM):
 
             # fmt: off
             CMP = pd.DataFrame(                                                           # noqa
-                {f'HWB.GS.{bt[3:]}': [  'ea',         1,          1,        1,   'N/A'],  # noqa
-                 f'HWB.GF':          [  'ea',         1,          1,        1,   'N/A']}, # noqa
+                {f'HWB.GS.{bt[3:]}': [  'ea',         1,          1,        1,   'N/A']}, # noqa
                 index = [            'Units','Location','Direction','Theta_0','Family']   # noqa
             ).T                                                                           # noqa
             # fmt: on
+            # if needed, add components to simulate damage from ground failure
+            if ground_failure:
+                # fmt: off
+                CMP_GF = pd.DataFrame(                                                 # noqa
+                    {f'HWB.GF':          [  'ea',         1,          1,        1,   'N/A']}, # noqa
+                    index = [     'Units','Location','Direction','Theta_0','Family']   # noqa
+                ).T                                                                    # noqa
+                # fmt: on
+
+                CMP = pd.concat([CMP, CMP_GF], axis=0)
 
             DL_ap = {
                 "Asset": {
