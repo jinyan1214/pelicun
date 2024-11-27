@@ -42,3 +42,7 @@ testFolder*
 .vscode*
 *.DS_Store
 /.ropeproject/
+
+/doc_src/
+/doc/build/
+/doc/source/api_reference/_autosummary
