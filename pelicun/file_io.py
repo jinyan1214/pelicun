@@ -43,6 +43,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -78,6 +79,21 @@ HAZUS_occ_converter = {
     'EDU': 'Educational',
     'IND': 'Industrial',
     'AGR': 'Industrial',
+}
+
+legacy_names = {
+    'damage_DB_FEMA_P58_2nd': 'FEMA P-58',
+    'damage_DB_Hazus_EQ_bldg': 'Hazus Earthquake - Buildings',
+    'damage_DB_Hazus_EQ_story': 'Hazus Earthquake - Stories',
+    'damage_DB_Hazus_EQ_trnsp': 'Hazus Earthquake - Transportation',
+    'damage_DB_Hazus_EQ_water': 'Hazus Earthquake - Water',
+    'damage_DB_Hazus_EQ_power': 'Hazus Earthquake - Power',
+    'damage_DB_SimCenter_Hazus_HU_bldg': 'Hazus Hurricane Wind',
+    'loss_repair_DB_FEMA_P58_2nd': 'FEMA P-58',
+    'loss_repair_DB_Hazus_EQ_bldg': 'Hazus Earthquake - Buildings',
+    'loss_repair_DB_Hazus_EQ_story': 'Hazus Earthquake - Stories',
+    'loss_repair_DB_Hazus_EQ_trnsp': 'Hazus Earthquake - Transportation',
+    'loss_repair_DB_SimCenter_Hazus_HU_bldg': 'Hazus Hurricane Wind',
 }
 
 
@@ -247,33 +263,49 @@ def save_to_csv(  # noqa: C901
 
 
 def substitute_default_path(
-    data_paths: list[str | pd.DataFrame],
+    data_paths: list[str | pd.DataFrame], log: base.Logger | None = None
 ) -> list[str | pd.DataFrame]:
     """
-    Substitute the default directory path with a specified path.
+    Substitute the default directory path.
 
     This function iterates over a list of data paths and replaces
-    occurrences of the 'PelicunDefault/' substring with the path
-    specified by `base.pelicun_path` concatenated with
-    '/resources/SimCenterDBDL/'. This operation is performed to update
-    paths that are using a default location to a user-defined location
-    within the pelicun framework. The updated list of paths is then
-    returned.
+    those with the 'PelicunDefault/' substring with the full paths to
+    model files in the built-in Damage and Loss Model Library.
+    Default paths are expected to follow the
+    `PelicunDefault/method_name/model_type.extension` structure. The
+    `method_name` identifies the methodology from those available in the
+    `{base.pelicun_path}/resources/dlml_resource_paths.json` file. The
+    `model_type` identifies the type of model requested. Currently, the
+    following types are supported: 'fragility', 'consequence_repair',
+    'loss_repair'. The `extension` is intended to identify 'CSV' files with
+    model parameters and 'JSON' files with metadata.
+    The `model_type` and `extension` strings are not limited to the
+    supported values. If you know a particular file exists in the method's
+    folder, you can use the corresponding `model_type.extension` to access
+    that file.
 
     Parameters
     ----------
-    data_paths: list of str
+    data_paths: list of str or pd.DataFrame
         A list containing the paths to data files. These paths may
         include a placeholder directory 'PelicunDefault/' that needs
-        to be substituted with the actual path specified in
-        `base.pelicun_path`.
+        to be substituted with the actual path specified in the
+        resource mapping.
+    log: Logger
+        Logger object to be used. If no object is specified, no logging
+        is performed.
 
     Returns
     -------
-    list of str
-        The list with updated paths where 'PelicunDefault/' has been
-        replaced with the specified path in `base.pelicun_path`
-        concatenated with '/resources/SimCenterDBDL/'.
+    list of str or pd.DataFrame
+
+    Raises
+    ------
+    KeyError
+      If the method_name after 'PelicunDefault/' does not exist in the
+      `resource_paths` keys.
+      If the method_name after 'PelicunDefault/' does not exist in the
+      legacy list of filenames preserved for backwards compatibility.
 
     Notes
     -----
@@ -281,27 +313,87 @@ def substitute_default_path(
       initialized and points to the correct directory where resources
       are located.
     - If a path in the input list does not contain 'PelicunDefault/',
-      it is added to the output list unchanged.
+      the path is added to the output list unchanged.
 
     Examples
     --------
-    >>> data_paths = ['PelicunDefault/data/file1.txt',
-        'data/file2.txt']
+    >>> data_paths = ['PelicunDefault/Hazus Hurricane/fragility.csv', 'data/file2.txt']
     >>> substitute_default_path(data_paths)
-    ['{base.pelicun_path}/resources/SimCenterDBDL/data/file1.txt',
-    'data/file2.txt']
+    ['{base.pelicun_path}/resources/DamageAndLossModelLibrary/'
+      'hurricane/building/portfolio/Hazus v5.1 coupled/fragility.csv',
+      'data/file2.txt']
 
     """
+    # Load the resource paths from the JSON file
+    resource_file_path = (
+        Path(base.pelicun_path) / 'resources' / 'dlml_resource_paths.json'
+    )
+    with resource_file_path.open('r') as file:
+        resource_paths = json.load(file)
+
     updated_paths: list[str | pd.DataFrame] = []
-    for data_path in data_paths:
-        if isinstance(data_path, str) and 'PelicunDefault/' in data_path:
-            path = data_path.replace(
-                'PelicunDefault/',
-                f'{base.pelicun_path}/resources/SimCenterDBDL/',
+    for data_path_str in data_paths:
+        if isinstance(data_path_str, str) and 'PelicunDefault/' in data_path_str:
+            data_path = Path(data_path_str)
+            # Extract the filename from the end after 'PelicunDefault/'
+            file_name = data_path.parts[-1]
+
+            # Check if there is a method name identified
+            method_name = data_path.parts[-2]
+
+            # <backwards compatibility>
+            if method_name == 'PelicunDefault':
+                # No method name, check for legacy input
+                if file_name.startswith(
+                    ('fragility_DB', 'damage_DB', 'bldg_repair_DB', 'loss_repair_DB')
+                ):
+                    if log:
+                        log.warning(
+                            'Default libraries are no longer referenced using '
+                            'the following placeholder filenames after "PelicunDB/": '
+                            '`fragility_DB...`, `damage_DB...`, `bldg_repair_DB...`, '
+                            '`loss_repair_DB...`. Such inputs will lead to errors in '
+                            'future versions of pelicun. Please replace such '
+                            'references with a combination of a specific method and '
+                            'data type. For example, use '
+                            '`PelicunDefault/FEMA P-58/fragility` to get FEMA P-58 '
+                            'damage models, and '
+                            '`PelicunDefault/Hazus Hurricane/consequence_repair` to '
+                            'get Hazus hurricane consequence models. See the online '
+                            'documentation for more details.'
+                        )
+
+                    method_name = legacy_names[file_name.split('.')[0]]
+                    if file_name.startswith(('fragility', 'damage')):
+                        data_type = 'fragility'
+                    else:
+                        data_type = 'consequence_repair'
+
+                    extension = file_name.split('.')[-1]
+                    file_name = f'{data_type}.{extension}'
+
+                else:
+                    msg = f'Default data path `{data_path_str}` not recognized.'
+                    raise KeyError(msg)
+
+            # Check if the method name exists in the resource paths dictionary
+            if method_name not in resource_paths:
+                msg = f'Method `{method_name}` not found in resource paths.'
+                raise KeyError(msg)
+            method_folder = resource_paths[method_name]
+
+            # Substitute the default path with a full path to the file
+            updated_path = str(
+                Path(base.pelicun_path)
+                / 'resources'
+                / 'DamageAndLossModelLibrary'
+                / method_folder
+                / file_name
             )
-            updated_paths.append(path)
+            updated_paths.append(updated_path)
         else:
-            updated_paths.append(data_path)
+            updated_paths.append(data_path_str)
+
     return updated_paths
 
 
@@ -377,11 +469,18 @@ def load_data(  # noqa: C901
     axis = {0: 1, 1: 0}
     the_index = data.columns if orientation == 1 else data.index
 
+    # Check for units information (case-insensitive)
     # if there is information about units, separate that information
     # and optionally apply conversions to all numeric values
-    if 'Units' in the_index:
-        units = data['Units'] if orientation == 1 else data.loc['Units']
-        data = data.drop(['Units'], axis=orientation)  # type: ignore
+    units_key = None
+    for key in the_index:
+        if str(key).lower() == 'units':
+            units_key = key
+            break
+
+    if units_key is not None:
+        units = data[units_key] if orientation == 1 else data.loc[units_key]
+        data = data.drop([units_key], axis=orientation)  # type: ignore
         data = base.convert_dtypes(data)
 
         if unit_conversion_factors is not None:

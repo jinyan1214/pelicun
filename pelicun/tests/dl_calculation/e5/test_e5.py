@@ -89,7 +89,7 @@ def test_dl_calculation_5(obtain_temp_dir: tuple[str, str]) -> None:
         output_path=None,
         coupled_edp=True,
         realizations=100,
-        auto_script_path='PelicunDefault/Hazus_Earthquake_IM.py',
+        auto_script_path='',
         detailed_results=False,
         output_format=None,
         custom_model_dir=None,
@@ -101,7 +101,7 @@ def test_dl_calculation_5(obtain_temp_dir: tuple[str, str]) -> None:
 
     # Ensure the number of files is as expected
     num_files = sum(1 for entry in Path(temp_dir).iterdir() if entry.is_file())
-    assert num_files == 19
+    assert num_files == 20
 
     # Verify their names
     files = {

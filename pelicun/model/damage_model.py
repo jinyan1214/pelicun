@@ -140,7 +140,7 @@ class DamageModel(PelicunModel):
         data_paths: list[str | pd.DataFrame],
         cmp_set: set[str],
         *,
-        warn_missing: bool = False,
+        warn_missing: bool = True,
     ) -> None:
         """
         Load damage model parameters.
@@ -175,19 +175,8 @@ class DamageModel(PelicunModel):
         self.log.div()
         self.log.msg('Loading damage model...', prepend_timestamp=False)
 
-        # <backwards compatibility>
-        for i, path in enumerate(data_paths):
-            if 'fragility_DB' in path:
-                path = path.replace('fragility_DB', 'damage_DB')  # noqa: PLW2901
-                self.log.warning(
-                    '`fragility_DB` is deprecated and will '
-                    'be dropped in future versions of pelicun. '
-                    'Please use `damage_DB` instead.'
-                )
-                data_paths[i] = path
-
         # replace default flag with default data path
-        data_paths = file_io.substitute_default_path(data_paths)
+        data_paths = file_io.substitute_default_path(data_paths, log=self.log)
 
         #
         # load damage parameter data into the models
@@ -530,10 +519,9 @@ class DamageModel_Base(PelicunModel):
             data = pd.concat((self.damage_params, data), axis=0)
 
         # drop redefinitions of components
-        data = data.groupby(data.index).first()
+        data = data.groupby(data.index).first(skipna=False)
 
         # TODO(AZ): load defaults for Demand-Offset and Demand-Directional
-
         self.damage_params = data
 
     def convert_damage_parameter_units(self) -> None:
@@ -588,6 +576,7 @@ class DamageModel_Base(PelicunModel):
         if self.damage_params is None:
             return
         cmp_mask = self.damage_params.index.isin(cmp_set, level=0)
+
         self.damage_params = self.damage_params.iloc[cmp_mask, :]
 
     def _get_pg_batches(
